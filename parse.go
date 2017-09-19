@@ -512,16 +512,7 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 		}
 
 		t, _ = time.Parse(IcsFormat, modified)
-		if strings.Contains(result, "TZID") {
-			tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
-			location := tzRegexp.FindStringSubmatch(result)[1]
-			timezone, err := time.LoadLocation(location)
-			if err == nil {
-				t = t.In(timezone)
-				_, offset := t.Zone()
-				t = t.Add(time.Duration(offset) * -time.Second)
-			}
-		}
+		t = applyTimezone(t, result)
 	}
 
 	return t
@@ -547,19 +538,23 @@ func (p *Parser) parseEventEnd(eventData string) time.Time {
 			modified = fmt.Sprintf("%sZ", modified)
 		}
 		t, _ = time.Parse(IcsFormat, modified)
-		if strings.Contains(result, "TZID") {
-			tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
-			location := tzRegexp.FindStringSubmatch(result)[1]
-			timezone, err := time.LoadLocation(location)
-			if err == nil {
-				t = t.In(timezone)
-				_, offset := t.Zone()
-				t = t.Add(time.Duration(offset) * -time.Second)
-			}
+		t = applyTimezone(t, result)
+	}
+	return t
+}
+
+func applyTimezone(t time.Time, dtString string) time.Time {
+	if strings.Contains(dtString, "TZID") {
+		tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
+		location := tzRegexp.FindStringSubmatch(dtString)[1]
+		timezone, err := time.LoadLocation(location)
+		if err == nil {
+			t = t.In(timezone)
+			_, offset := t.Zone()
+			t = t.Add(time.Duration(offset) * -time.Second)
 		}
 	}
 	return t
-
 }
 
 // parses the event RRULE (the repeater)
