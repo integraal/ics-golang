@@ -503,14 +503,8 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 		modified := trimField(resultWholeDay, "DTSTART;VALUE=DATE:")
 		t, _ = time.Parse(IcsFormatWholeDay, modified)
 	} else {
-		var timezone *time.Location
 		// event that has start hour and minute
 		result := re.FindString(eventData)
-		if strings.Contains(result, "TZID") {
-			tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
-			location := tzRegexp.FindStringSubmatch(result)[1]
-			timezone, _ = time.LoadLocation(location)
-		}
 		modified := trimField(result, "DTSTART(;TZID=.*?){0,1}:")
 
 		if !strings.Contains(modified, "Z") {
@@ -518,10 +512,15 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 		}
 
 		t, _ = time.Parse(IcsFormat, modified)
-		if timezone != nil {
-			t = t.In(timezone)
-			_, offset := t.Zone()
-			t = t.Add(time.Duration(offset) * -time.Second)
+		if strings.Contains(result, "TZID") {
+			tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
+			location := tzRegexp.FindStringSubmatch(result)[1]
+			timezone, err := time.LoadLocation(location)
+			if err == nil {
+				t = t.In(timezone)
+				_, offset := t.Zone()
+				t = t.Add(time.Duration(offset) * -time.Second)
+			}
 		}
 	}
 
@@ -548,6 +547,16 @@ func (p *Parser) parseEventEnd(eventData string) time.Time {
 			modified = fmt.Sprintf("%sZ", modified)
 		}
 		t, _ = time.Parse(IcsFormat, modified)
+		if strings.Contains(result, "TZID") {
+			tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
+			location := tzRegexp.FindStringSubmatch(result)[1]
+			timezone, err := time.LoadLocation(location)
+			if err == nil {
+				t = t.In(timezone)
+				_, offset := t.Zone()
+				t = t.Add(time.Duration(offset) * -time.Second)
+			}
+		}
 	}
 	return t
 
