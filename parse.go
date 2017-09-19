@@ -494,7 +494,7 @@ func (p *Parser) parseEventModified(eventData string) time.Time {
 // parses the event start time
 func (p *Parser) parseEventStart(eventData string) time.Time {
 	reWholeDay, _ := regexp.Compile(`DTSTART;VALUE=DATE:.*?\n`)
-	re, _ := regexp.Compile(`DTSTART(;TZID=.*?){0,1}:.*?\n`)
+	re, _ := regexp.Compile(`DTSTART(;TZID=.*?){0,1}:(.*)?\n`)
 	resultWholeDay := reWholeDay.FindString(eventData)
 	var t time.Time
 
@@ -503,8 +503,14 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 		modified := trimField(resultWholeDay, "DTSTART;VALUE=DATE:")
 		t, _ = time.Parse(IcsFormatWholeDay, modified)
 	} else {
+		var timezone *time.Location
 		// event that has start hour and minute
 		result := re.FindString(eventData)
+		if strings.Contains(result, "TZID") {
+			tzRegexp, _ := regexp.Compile(`TZID="([^"]+)"`)
+			location := tzRegexp.FindStringSubmatch(result)[1]
+			timezone, _ = time.LoadLocation(location)
+		}
 		modified := trimField(result, "DTSTART(;TZID=.*?){0,1}:")
 
 		if !strings.Contains(modified, "Z") {
@@ -512,6 +518,9 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 		}
 
 		t, _ = time.Parse(IcsFormat, modified)
+		if timezone != nil {
+			t = t.In(timezone)
+		}
 	}
 
 	return t
